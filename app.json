@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "gpt_mobil",
-    "slug": "gpt_mobil",
+    "name": "Teach'em",
+    "slug": "teachem",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/7352f6de-a3cf-4e06-af69-992e9c035514"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -21,6 +22,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "codebysamir.teachem",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
@@ -28,6 +30,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7352f6de-a3cf-4e06-af69-992e9c035514"
+      }
+    },
+    "owner": "codebysamir",
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
