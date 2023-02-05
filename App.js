@@ -1,7 +1,19 @@
 import { StatusBar } from 'expo-status-bar';
 import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view'
-import { useState, useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, Modal } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { 
+  ActivityIndicator, 
+  Pressable, 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  View, 
+  Modal, 
+  Platform, 
+  Keyboard, 
+  KeyboardAvoidingView,
+  Animated 
+} from 'react-native';
 import ChatMessage from './components/ChatMessage';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faGear } from '@fortawesome/free-solid-svg-icons/faGear'
@@ -16,8 +28,45 @@ export default function App() {
   const [asideVisbility, setAsideIsVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [tokens, setTokens] = useState(0)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   const scrollRef = useRef()
+  const fadeAnim = useRef(new Animated.Value(0)).current
+
+  const fadeIn = () => {
+    Animated.timing(fadeAnim, {toValue: 1, duration: 4000, useNativeDriver: true}).start()
+  }
+  const fadeOut = () => {
+    Animated.timing(fadeAnim, {toValue: 0, duration: 1000, useNativeDriver: true}).start()
+  }
+
+  if (Platform.OS === 'android') {
+    useEffect(() => {
+      const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', e => {
+        setKeyboardHeight(e.endCoordinates.height)
+        scrollRef.current.scrollToEnd({animated: true})
+      })
+      const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0))
+  
+      return () => {
+        keyboardDidShowListener.remove()
+        keyboardDidHideListener.remove()
+      }
+    }, [])
+  } else {
+    useEffect(() => {
+      const keyboardWillShowListener = Keyboard.addListener('keyboardWillShow', e => {
+        setKeyboardHeight(e.endCoordinates.height)
+        scrollRef.current.scrollToEnd({animated: true})
+      })
+      const keyboardWillHideListener = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0))
+  
+      return () => {
+        keyboardWillShowListener.remove()
+        keyboardWillHideListener.remove()
+      }
+    }, [])
+  }
 
   async function handleInput() {
     console.log(input)
@@ -107,7 +156,7 @@ export default function App() {
           </Pressable>
         </View> :
         <View style={styles.chatSection}>
-          <View style={styles.topbar}>
+          <View style={(Platform.OS === 'ios') ? [styles.topbar, styles.topbarIOS] : styles.topbar}>
             <Pressable onPress={handleShowAside} >
               <FontAwesomeIcon icon={ faGear } style={styles.test} />
             </Pressable>
@@ -117,7 +166,7 @@ export default function App() {
             </Pressable>
           </View>
           {error !== undefined ? <Text style={styles.error}>{error}</Text> :
-          <View style={styles.chathistory}>
+          <View>
             <KeyboardAwareFlatList 
               data={chatlog} 
               renderItem={itemData => {
@@ -126,11 +175,10 @@ export default function App() {
                 )
               }}
               ref={scrollRef}
+              style={{height: (Platform.OS === 'ios' ? 760 : 640) - keyboardHeight}}
             />
-            {/* <ScrollView>
-              {chatlog.map((chat, index) => <ChatMessage key={index} message={chat}/>)}
-            </ScrollView> */}
-          </View>}
+          </View>
+          }
           <View style={styles.inputForm}>
             <TextInput 
               style={styles.textInput} 
@@ -145,6 +193,8 @@ export default function App() {
               <Text style={styles.btnText}>Send</Text>
             </Pressable>}
           </View>
+          {/* <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : null}>
+          </KeyboardAvoidingView> */}
         </View>}
       </View>
     </>
@@ -170,8 +220,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   chatSection: {
-    width: '100%',
-    height: '100%',
+    flex: 1,
+    // width: '100%',
+    // height: '100%',
     backgroundColor: '#3a65ab',
     // padding: 40,
     position: 'relative',
@@ -179,21 +230,31 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   chathistory: {
-    paddingBottom: 120
+    height: '80%',
+    // paddingBottom: 120,
   },
   topbar: {
+    // flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'white',
   },
+  topbarIOS: {
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    // paddingBottom: 16,
+  },
   inputForm: {
-    position: 'absolute',
-    top: '95%',
-    width: '100%',
+    // position: 'absolute',
+    // top: '95%',
+    // width: '100%',
+    // flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#3a65ab'
   },
   textInput: {
     backgroundColor: '#242424',
@@ -203,18 +264,22 @@ const styles = StyleSheet.create({
     // left: '10%',
     borderWidth: 1,
     borderRadius: 5,
+    height: 40,
     width: '80%',
     padding: 6,
   },
   button: {
     backgroundColor: 'transparent',
-    padding: 8,
+    padding: 12,
     // borderWidth: 1,
-    width: '15%',
+    width: '20%',
+    justifyContent: 'center',
   },
   btnText: {
     color: 'white',
     fontWeight: 'bold',
+    // height: 30,
+    textAlign: 'center',
   },
   settingProps: {
     // height: '50%',
@@ -252,7 +317,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   error: {
-    color: 'whtie',
+    color: 'white',
     backgroundColor: '#f54542',
     padding: 16
   }
