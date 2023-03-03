@@ -8,6 +8,7 @@ import {
   Text, 
   TextInput, 
   View, 
+  Image,
   Modal, 
   Platform, 
   Keyboard, 
@@ -15,20 +16,28 @@ import {
   Animated 
 } from 'react-native';
 import ChatMessage from './components/ChatMessage';
+import ImageHistory from './components/ImageHistory';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faGear } from '@fortawesome/free-solid-svg-icons/faGear'
-import { faXmark } from '@fortawesome/free-solid-svg-icons/faXmark'
-import { faTrash } from '@fortawesome/free-solid-svg-icons/faTrash'
+import { faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar } from '@fortawesome/free-solid-svg-icons'
+import { library } from '@fortawesome/fontawesome-svg-core';
+import Logo from './components/Logo';
+
+library.add(faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar)
+
+const LOCAL = 'http://192.168.1.101:3001'
 
 export default function App() {
   const [input, setInput] = useState('')
   const [chatlog, setChatLog] = useState([])
   const [error, setError] = useState()
   const [prompt, setPrompt] = useState('')
+  const [showChatSection, setShowChatSection] = useState(true)
   const [asideVisbility, setAsideIsVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [tokens, setTokens] = useState(0)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [imageGeneration, setImageGeneration] = useState(false)
+  const [showImageHistory, setShowImageHistory] = useState(false)
 
   const scrollRef = useRef()
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -66,6 +75,50 @@ export default function App() {
         keyboardWillHideListener.remove()
       }
     }, [])
+  }
+
+  function handleHelper() {
+    if (error !== undefined) setError()
+    if (imageGeneration) {
+      handleImage()
+    } else {
+      handleInput()
+    }
+  }
+
+  async function handleImage() {
+    console.log(input)
+
+    try {
+      setIsLoading(isLoading => !isLoading)
+      const request = await fetch(LOCAL + '/api/v1/openai/image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: input
+      })
+      })
+      const result = await request.json()
+
+      setChatLog((chatlog) => [
+        ...chatlog,
+        {
+          imagePrompt: input,
+          image: `data:image/jpeg;base64,${result.message}`,
+          id: result.created,
+        }
+      ])
+      console.log(chatlog)
+    } catch (err) {
+      console.log('handleImage Error is: ' + err)
+      setError('Die Daten konten nicht vom Server geladen werden, bitte versuche es erneut.')
+    }
+    setInput('')
+    setIsLoading(isLoading => !isLoading)
+    scrollRef.current.scrollToEnd({animated: true})
+    error !== undefined && setError()
   }
 
   async function handleInput() {
@@ -126,11 +179,21 @@ export default function App() {
   function handleSettingProp() {
     console.log('test')
   }
+  
+  function handleSwitchSection() {
+    console.log('swich pages')
+    setShowImageHistory(!showImageHistory)
+    setShowChatSection(!showChatSection)
+    setAsideIsVisible(!asideVisbility)
+  }
 
+  function handleImageGeneration() {
+    setImageGeneration(!imageGeneration)
+  }
 
   return (
     <>
-      <StatusBar style='light' />
+      <StatusBar style={asideVisbility ? 'dark' : 'light'} />
       <View style={styles.container}>
         {tokens === 2500 && 
         <View style={styles.modal}>
@@ -140,25 +203,50 @@ export default function App() {
         </View>}
         {asideVisbility ? 
         <View style={styles.aside}>
+          <View style={styles.pages}>
+            <Image source={require('./assets/adaptive-icon.png')} style={styles.logo} />
+            {/* <Logo /> */}
+          </View>
           <View style={styles.settingProps}>
+            {!showChatSection && <Pressable style={styles.settingsPropBtn} onPress={handleSwitchSection}>
+              <FontAwesomeIcon icon='fa-message' color='black' size={30} style={{marginRight: 16,}} /> 
+              <Text style={{textAlign: 'center',}}>Chat Section</Text>
+            </Pressable>}
+            {!showImageHistory && <Pressable style={styles.settingsPropBtn} onPress={handleSwitchSection}>
+              <FontAwesomeIcon icon={faImage} color='black' size={30} style={{marginRight: 16,}} /> 
+              <Text style={{textAlign: 'center',}}>Created Images History</Text>
+            </Pressable>}
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
+              <FontAwesomeIcon icon='fa-coins' color='black' size={30} style={{marginRight: 16,}} /> 
               <Text style={{textAlign: 'center',}}>Tokens</Text>
             </Pressable>
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
+              <FontAwesomeIcon icon='fa-star' color='black' size={30} style={{marginRight: 16,}} /> 
               <Text style={{textAlign: 'center',}}>Pro Version</Text>
             </Pressable>
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
+              <FontAwesomeIcon icon='fa-gear' color='black' size={30} style={{marginRight: 16,}} /> 
               <Text style={{textAlign: 'center',}}>System Settings</Text>
             </Pressable>
           </View>
           <Pressable style={styles.closeAsideBtn} onPress={handleShowAside}>
-            <FontAwesomeIcon icon={ faXmark } style={{color: 'white',}} size={40} />
+            <FontAwesomeIcon icon={ faXmark } style={{color: 'black',}} size={40} />
           </Pressable>
         </View> :
+        showImageHistory ?
+        <View style={styles.imageHistory}>
+          <View style={(Platform.OS === 'ios') ? [styles.topbar, styles.topbarIOS] : styles.topbar}>
+            <Pressable onPress={handleShowAside} >
+              <FontAwesomeIcon icon={ faBars } style={styles.test} />
+            </Pressable>
+          </View>
+          <ImageHistory /> 
+        </View>
+        :
         <View style={styles.chatSection}>
           <View style={(Platform.OS === 'ios') ? [styles.topbar, styles.topbarIOS] : styles.topbar}>
             <Pressable onPress={handleShowAside} >
-              <FontAwesomeIcon icon={ faGear } style={styles.test} />
+              <FontAwesomeIcon icon={ faBars } style={styles.test} />
             </Pressable>
             <Text style={{color: 'white', fontWeight: 'bold'}}>Token used: {tokens}</Text>
             <Pressable onPress={handleClearConversation}>
@@ -180,16 +268,21 @@ export default function App() {
           </View>
           }
           <View style={styles.inputForm}>
+            <Pressable style={!imageGeneration ? styles.imgBtn : styles.imgBtnActive} onPress={handleImageGeneration} >
+              <FontAwesomeIcon icon={ faImage } style={{color: 'white'}} size={30} />
+            </Pressable>
             <TextInput 
               style={styles.textInput} 
               value={input} 
+              placeholder={imageGeneration ? 'Enter detailed image description' : null}
+              placeholderTextColor={'#ffffff88'}
               onChangeText={e => setInput(e)}
             />
             {isLoading ? 
             <View style={styles.loading}>
               <ActivityIndicator color={'white'} size={'large'} />
             </View> :
-            <Pressable style={styles.button} onPress={handleInput}>
+            <Pressable style={styles.button} onPress={handleHelper}>
               <Text style={styles.btnText}>Send</Text>
             </Pressable>}
           </View>
@@ -210,12 +303,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  logo: {
+    width: 350, 
+    height: 350, 
+    top: '-20%',
+    marginBottom: '-50%',
+    resizeMode: 'stretch',
+  },
   aside: {
     width: '100%',
     height: '100%',
     position: 'absolute',
     // zIndex: 10,
-    backgroundColor: 'darkgrey',
+    backgroundColor: 'ghostwhite',
     padding: 40,
     justifyContent: 'space-between'
   },
@@ -256,6 +356,26 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#3a65ab'
   },
+  imgBtn: {
+    color: 'white',
+    justifyContent: 'center',
+    alignItems: 'center', 
+    // padding: 4, 
+    marginRight: 8,
+    flex: 1,
+    // width: '20%'
+  },
+  imgBtnActive: {
+    backgroundColor: 'green', 
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'white',
+    borderRadius: 5,
+    // padding: 8, 
+    marginRight: 8,
+    flex: 1
+  },
   textInput: {
     backgroundColor: '#242424',
     color: 'white',
@@ -265,12 +385,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
     height: 40,
-    width: '80%',
+    width: '65%',
     padding: 6,
   },
   button: {
     backgroundColor: 'transparent',
-    padding: 12,
+    padding: 6,
     // borderWidth: 1,
     width: '20%',
     justifyContent: 'center',
@@ -280,15 +400,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     // height: 30,
     textAlign: 'center',
+    fontSize: 16,
+    alignItems: 'center',
   },
   settingProps: {
     // height: '50%',
     paddingVertical: 16,
   },
   settingsPropBtn: {
-    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
     borderWidth: 1,
-    marginBottom: 16,
+    borderRadius: 10,
+    marginBottom: 24,
   },
   closeAsideBtn: {
     alignItems: 'center',
@@ -320,5 +446,11 @@ const styles = StyleSheet.create({
     color: 'white',
     backgroundColor: '#f54542',
     padding: 16
+  },
+  imageHistory: {
+    flex: 1,
+    paddingTop: 20,
+    backgroundColor: '#3a65ab',
+    position: 'relative'
   }
 });
