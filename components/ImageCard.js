@@ -3,13 +3,9 @@ import React, { useState } from 'react'
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native'
 
 export default function ImageCard({post, setFullscreen, setImageDetails}) {
-    const [isPressed, setIsPressed] = useState(false)
-
-    console.log('imageCards laoded')
 
     function handlePressImg() {
         console.log('pressed')
-        // setIsPressed(!isPressed)
         setFullscreen(true)
         setImageDetails({
             id: post._id,
@@ -22,17 +18,11 @@ export default function ImageCard({post, setFullscreen, setImageDetails}) {
     <View style={styles.imageContainer}>
         <Image source={{uri: post.photo}} style={styles.image} />
         <Pressable style={styles.press} onPress={handlePressImg} >
-            <View style={[styles.overlay, isPressed && styles.overlay100]}>
+            <View style={styles.overlay}>
             <View style={styles.overlayTextBox}>
                 <Text style={{color: 'white'}}>
                     {post.prompt}
                 </Text>
-                {/* <Pressable onPress={handleSaveImg}>
-                {!isDownloaded ?
-                    <Text style={{color: 'white', textAlign: 'center'}}>Save in Gallery</Text>
-                    : <Text style={{color: 'green', textAlign: 'center'}}>Saved</Text>
-                }
-                </Pressable> */}
             </View>
             </View>
         </Pressable>

@@ -18,13 +18,12 @@ import {
 import ChatMessage from './components/ChatMessage';
 import ImageHistory from './components/ImageHistory';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar } from '@fortawesome/free-solid-svg-icons'
+import { faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload } from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core';
 import Logo from './components/Logo';
+import { LOCAL, RENDER_BACKEND_URL } from '@env'
 
-library.add(faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar)
-
-const LOCAL = 'http://192.168.1.101:3001'
+library.add(faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload)
 
 export default function App() {
   const [input, setInput] = useState('')
@@ -91,7 +90,7 @@ export default function App() {
 
     try {
       setIsLoading(isLoading => !isLoading)
-      const request = await fetch(LOCAL + '/api/v1/openai/image', {
+      const request = await fetch(RENDER_BACKEND_URL + '/api/v1/openai/image', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -126,7 +125,7 @@ export default function App() {
 
     try {
       setIsLoading(isLoading => !isLoading)
-      const request = await fetch('https://openai-api-backend.glitch.me/message', {
+      const request = await fetch(RENDER_BACKEND_URL + '/api/v1/openai/message', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

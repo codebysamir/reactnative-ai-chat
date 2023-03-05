@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { View, Text, StyleSheet, FlatList } from 'react-native'
 import ImageCard from './ImageCard'
 import ImageCardFullscreen from './ImageCardFullscreen'
-
-const LOCAL = 'http://192.168.1.101:3001'
+import { LOCAL, RENDER_BACKEND_URL } from '@env'
 
 export default function ImageHistory() {
   const [allPosts, setAllPosts] = useState([])
@@ -16,7 +15,7 @@ export default function ImageHistory() {
   
   async function handleGetImages() {
     try {
-      const getImage = await fetch(LOCAL + '/api/v1/post', {
+      const getImage = await fetch(RENDER_BACKEND_URL + '/api/v1/post', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

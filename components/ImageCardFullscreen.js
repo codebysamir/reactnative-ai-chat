@@ -1,13 +1,12 @@
 import React, { useState } from 'react'
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-
-const LOCAL = 'http://192.168.1.101:3001'
+import * as MediaLibrary from 'expo-media-library'
+import * as FileSystem from 'expo-file-system'
+import { LOCAL, RENDER_BACKEND_URL } from '@env'
 
 export default function ImageCardFullscreen({image, setImgFullscreen, handleGetImages}) {
     const [isPressed, setIsPressed] = useState(false)
-
-    console.log(image)
 
     function handlePressImg() {
         console.log('pressed')
@@ -21,7 +20,7 @@ export default function ImageCardFullscreen({image, setImgFullscreen, handleGetI
     const photoId = image.photo.slice(61, -4)
 
     async function handleDeletePost() {
-      const deletePost = await fetch(LOCAL + '/api/v1/post/delete', {
+      const deletePost = await fetch(RENDER_BACKEND_URL + '/api/v1/post/delete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,6 +41,37 @@ export default function ImageCardFullscreen({image, setImgFullscreen, handleGetI
       // alert('successful deleted')
     }
 
+    async function handleSaveImage() {
+      const uri = image.photo
+      try {
+          const {status} = await MediaLibrary.requestPermissionsAsync()
+          if (status !== 'granted') {
+            console.log('Permission denied to access media library')
+            alert('Permission denied to access media library')
+            return
+          }
+          console.log(FileSystem)
+          const localUri = FileSystem.documentDirectory + 'myimage.jpg'
+          const downloadResult = await FileSystem.downloadAsync(
+            uri,
+            localUri
+          )
+
+          const asset = await MediaLibrary.createAssetAsync(downloadResult.uri)
+          const album = await MediaLibrary.getAlbumAsync('TeachemApp')
+          if (album === null) {
+              await MediaLibrary.createAlbumAsync('TeachemApp', asset, false)
+          } else {
+              await MediaLibrary.addAssetsToAlbumAsync([asset], album, false)
+          }
+          console.log('Image saved successfully')
+          alert('Image saved successfully')
+      } catch (error) {
+          console.log('Error saving image: ', error)
+          alert('Error saving image: ', error)
+      }
+    }
+
   return (
     <>
       <Pressable style={{padding: 16, flexDirection: 'row', alignItems: 'center'}} onPress={handleImgFullscreen} >
@@ -51,20 +81,17 @@ export default function ImageCardFullscreen({image, setImgFullscreen, handleGetI
       <View style={styles.imageContainer}>
           <Image source={{uri: image.photo}} style={styles.image} />
           <View style={styles.overlayTextBox}>
-              <Text style={{color: 'white'}}>
+              <Text style={{color: 'white', fontSize: 20}}>
                   {image.prompt}
               </Text>
               <View style={styles.iconsBar}>
                 <Pressable onPress={handleDeletePost}>
                   <FontAwesomeIcon icon='fa-trash' color='white' />
                 </Pressable>
+                <Pressable onPress={handleSaveImage}>
+                  <FontAwesomeIcon icon={'fa-download'} color='white' />
+                </Pressable>
               </View>
-              {/* <Pressable onPress={handleSaveImg}>
-              {!isDownloaded ?
-                  <Text style={{color: 'white', textAlign: 'center'}}>Save in Gallery</Text>
-                  : <Text style={{color: 'green', textAlign: 'center'}}>Saved</Text>
-              }
-              </Pressable> */}
           </View>
           {/* <Pressable style={styles.press} onPress={handlePressImg} >
             <View style={[styles.overlay, isPressed && styles.overlay100]}>
@@ -110,7 +137,7 @@ const styles = StyleSheet.create({
       // bottom: 0,
       // left: 0,
       // right: 0,
-      padding: 20,
+      padding: 32,
     },
     press: {
       width: '100%',
@@ -120,7 +147,9 @@ const styles = StyleSheet.create({
       left: 0,
     },
     iconsBar: {
-      paddingTop: 16,
-      alignItems: 'flex-end',
+      paddingTop: 32,
+      justifyContent: 'space-around',
+      flexDirection: 'row',
+      margin: 'auto'
     }
 })

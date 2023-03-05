@@ -1,9 +1,7 @@
 import { width } from '@fortawesome/free-solid-svg-icons/faGear'
 import React, { useState } from 'react'
 import { StyleSheet, View, Text, Image, Pressable } from 'react-native'
-
-const LOCAL = 'http://192.168.1.101:3001'
-const DEFAULT = 'notPressed'
+import { LOCAL, RENDER_BACKEND_URL } from '@env'
 
 export default function ChatMessage({message}) {
   const [isPressed, setIsPressed] = useState(false)
@@ -20,8 +18,6 @@ export default function ChatMessage({message}) {
   }
 
   function handlePressImg() {
-    // if (isPressed !== DEFAULT) return setIsPressed(DEFAULT)
-    // setIsPressed(message.id)
     console.log('pressed')
     setIsPressed(!isPressed)
   }
@@ -30,7 +26,7 @@ export default function ChatMessage({message}) {
     if (isSaved) return
     setLoading(true)
     try {
-      const postImg = await fetch(LOCAL + '/api/v1/post', {
+      const postImg = await fetch(RENDER_BACKEND_URL + '/api/v1/post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
