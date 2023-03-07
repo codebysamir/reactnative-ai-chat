@@ -38,7 +38,7 @@ export default function ImageCardFullscreen({image, setImgFullscreen, handleGetI
       if (!result.success) return alert('image couldnt be deleted')
       handleImgFullscreen()
       handleGetImages()
-      // alert('successful deleted')
+      alert('successful deleted')
     }
 
     async function handleSaveImage() {

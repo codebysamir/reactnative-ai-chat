@@ -13,17 +13,21 @@ import {
   Platform, 
   Keyboard, 
   KeyboardAvoidingView,
-  Animated 
+  Animated, 
+  PermissionsAndroid
 } from 'react-native';
 import ChatMessage from './components/ChatMessage';
 import ImageHistory from './components/ImageHistory';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload } from '@fortawesome/free-solid-svg-icons'
+import { 
+  faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload, faMicrophone 
+} from '@fortawesome/free-solid-svg-icons'
 import { library } from '@fortawesome/fontawesome-svg-core';
 import Logo from './components/Logo';
 import { LOCAL, RENDER_BACKEND_URL } from '@env'
+import { Audio } from "expo-av"
 
-library.add(faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload)
+library.add(faImage, faBars, faTrash, faXmark, faGear, faAngleLeft, faCoins, faMessage, faStar, faDownload, faMicrophone)
 
 export default function App() {
   const [input, setInput] = useState('')
@@ -37,6 +41,7 @@ export default function App() {
   const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [imageGeneration, setImageGeneration] = useState(false)
   const [showImageHistory, setShowImageHistory] = useState(false)
+  const [recording, setRecording] = useState(null)
 
   const scrollRef = useRef()
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -125,36 +130,59 @@ export default function App() {
 
     try {
       setIsLoading(isLoading => !isLoading)
-      const request = await fetch(RENDER_BACKEND_URL + '/api/v1/openai/message', {
+      const request = await fetch(RENDER_BACKEND_URL + '/api/v1/openai/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
         // 'Content-Type': 'text/event-stream'
       },
       body: JSON.stringify({
-        message: prompt !== '' ? `${prompt} Kid: ${input}` : `Kid: ${input}`
+        message: input,
+        chatHistory: prompt !== '' ? prompt : null
       })
       })
       const result = await request.json()
 
       // Trim Whitespace in the beginning
       const trimResult = result.message.trimStart()
+      const usedTokens = result.tokens
 
       console.log('question: ' + input, 'answer: ' + trimResult)
       setChatLog((chatlog) => [
         ...chatlog,
         {
           question: input,
-          answer: trimResult
+          answer: trimResult,
+          tokens: usedTokens
         }
       ])
       console.log(chatlog)
       setPrompt(
         prompt => prompt !== '' ?
-       `${prompt} Kid: ${input} ${trimResult}` :
-        `Kid: ${input} ${trimResult}`
+        [
+          ...prompt,
+          {
+            role: 'user',
+            content: input
+          },
+          {
+            role: 'assistant',
+            content: trimResult
+          }
+        ]
+        :
+        [
+          {
+            role: 'user',
+            content: input
+          },
+          {
+            role: 'assistant',
+            content: trimResult
+          }
+        ]
       )
-      setTokens(tokens => tokens += result.tokens)
+      setTokens(tokens => tokens += usedTokens)
 
     } catch (err) {
       console.log(err)
@@ -190,6 +218,78 @@ export default function App() {
     setImageGeneration(!imageGeneration)
   }
 
+  async function getMicrophonePermission() {
+    try {
+      const { status } = await Audio.requestPermissionsAsync()
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      console.log(status)
+      if (status === 'granted') {
+        console.log('Microphone permission granted')
+      } else {
+        console.log('Microphone permission denied')
+        alert('Microphone permission denied')
+      }
+    } catch (error) {
+      console.log('Failed to get microphone permission', error)
+      alert('Failed to get microphone permission', error)
+    }
+  }
+
+  async function handleStartRecording() {
+    await getMicrophonePermission()
+    const recording = new Audio.Recording()
+    try {
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
+      await recording.startAsync()
+      setRecording(recording)
+    } catch (error) {
+      console.error('Failed to start recording', error)
+      alert('Failed to start recording', error)
+    }
+  }
+
+  async function handleStopRecording() {
+    try {
+      await recording.stopAndUnloadAsync()
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+      const uri = recording.getURI()
+      console.log('Recordet audio uri:', uri)
+      setRecording(null)
+      setIsLoading(!isLoading)
+
+      console.log('Sending URI to backend...')
+      const formData = new FormData()
+      formData.append('audio', {
+        uri: uri,
+        name: 'recordingText.mp4',
+        type: 'audio/mp4',
+      })
+
+      const result = await fetch(LOCAL + '/api/v1/openai/stt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        body: formData
+      })
+
+      const audioText = await result.json()
+      console.log('SST AUDIO TEXT IS: ', audioText)
+      setInput(audioText.message)
+      // setIsLoading(false)
+    } catch (error) {
+      console.error('Failed to stop recording', error)
+      alert('Failed to stop recording', error)
+      setIsLoading(false)
+    }
+    handleInput()
+  }
+
   return (
     <>
       <StatusBar style={asideVisbility ? 'dark' : 'light'} />
@@ -203,29 +303,29 @@ export default function App() {
         {asideVisbility ? 
         <View style={styles.aside}>
           <View style={styles.pages}>
-            <Image source={require('./assets/adaptive-icon.png')} style={styles.logo} />
+            <Image source={require('./assets/adaptive-icon.png')} style={(Platform.OS === 'ios') ? [styles.logo, styles.logoIOS] : [styles.logo, styles.logoAndroid]} />
             {/* <Logo /> */}
           </View>
           <View style={styles.settingProps}>
             {!showChatSection && <Pressable style={styles.settingsPropBtn} onPress={handleSwitchSection}>
               <FontAwesomeIcon icon='fa-message' color='black' size={30} style={{marginRight: 16,}} /> 
-              <Text style={{textAlign: 'center',}}>Chat Section</Text>
+              <Text style={{textAlign: 'center', fontSize: 16,}}>Chat Section</Text>
             </Pressable>}
             {!showImageHistory && <Pressable style={styles.settingsPropBtn} onPress={handleSwitchSection}>
               <FontAwesomeIcon icon={faImage} color='black' size={30} style={{marginRight: 16,}} /> 
-              <Text style={{textAlign: 'center',}}>Created Images History</Text>
+              <Text style={{textAlign: 'center', fontSize: 16,}}>Created Images History</Text>
             </Pressable>}
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
               <FontAwesomeIcon icon='fa-coins' color='black' size={30} style={{marginRight: 16,}} /> 
-              <Text style={{textAlign: 'center',}}>Tokens</Text>
+              <Text style={{textAlign: 'center', fontSize: 16,}}>Tokens</Text>
             </Pressable>
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
               <FontAwesomeIcon icon='fa-star' color='black' size={30} style={{marginRight: 16,}} /> 
-              <Text style={{textAlign: 'center',}}>Pro Version</Text>
+              <Text style={{textAlign: 'center', fontSize: 16,}}>Pro Version</Text>
             </Pressable>
             <Pressable style={styles.settingsPropBtn} onPress={handleSettingProp}>
               <FontAwesomeIcon icon='fa-gear' color='black' size={30} style={{marginRight: 16,}} /> 
-              <Text style={{textAlign: 'center',}}>System Settings</Text>
+              <Text style={{textAlign: 'center', fontSize: 16,}}>System Settings</Text>
             </Pressable>
           </View>
           <Pressable style={styles.closeAsideBtn} onPress={handleShowAside}>
@@ -236,7 +336,7 @@ export default function App() {
         <View style={styles.imageHistory}>
           <View style={(Platform.OS === 'ios') ? [styles.topbar, styles.topbarIOS] : styles.topbar}>
             <Pressable onPress={handleShowAside} >
-              <FontAwesomeIcon icon={ faBars } style={styles.test} />
+              <FontAwesomeIcon icon={ faBars } style={styles.test} size={24} />
             </Pressable>
           </View>
           <ImageHistory /> 
@@ -245,11 +345,11 @@ export default function App() {
         <View style={styles.chatSection}>
           <View style={(Platform.OS === 'ios') ? [styles.topbar, styles.topbarIOS] : styles.topbar}>
             <Pressable onPress={handleShowAside} >
-              <FontAwesomeIcon icon={ faBars } style={styles.test} />
+              <FontAwesomeIcon icon={ faBars } style={styles.test} size={24} />
             </Pressable>
             <Text style={{color: 'white', fontWeight: 'bold'}}>Token used: {tokens}</Text>
             <Pressable onPress={handleClearConversation}>
-              <FontAwesomeIcon icon={ faTrash } style={{color: 'white', fontSize: 16}} />
+              <FontAwesomeIcon icon={ faTrash } style={{color: 'white'}} size={20} />
             </Pressable>
           </View>
           {error !== undefined ? <Text style={styles.error}>{error}</Text> :
@@ -273,17 +373,28 @@ export default function App() {
             <TextInput 
               style={styles.textInput} 
               value={input} 
-              placeholder={imageGeneration ? 'Enter detailed image description' : null}
+              placeholder={imageGeneration ? 'Enter image description' : null}
               placeholderTextColor={'#ffffff88'}
               onChangeText={e => setInput(e)}
             />
             {isLoading ? 
-            <View style={styles.loading}>
-              <ActivityIndicator color={'white'} size={'large'} />
-            </View> :
-            <Pressable style={styles.button} onPress={handleHelper}>
-              <Text style={styles.btnText}>Send</Text>
-            </Pressable>}
+              <View style={styles.loading}>
+                <ActivityIndicator color={'white'} size={'large'} />
+              </View> 
+              : input.length > 0 ?
+              <Pressable style={styles.button} onPress={handleHelper}>
+                <Text style={styles.btnText}>Send</Text>
+              </Pressable>
+            :
+              !recording ?
+                <Pressable style={styles.voiceRecorder} onPress={handleStartRecording} >
+                  <FontAwesomeIcon icon="fa-microphone" size={30} color={'white'} />
+                </Pressable>
+                :
+                <Pressable style={styles.voiceRecorderStop} onPress={handleStopRecording} >
+                  <FontAwesomeIcon icon="fa-microphone" size={30} color={'white'} />
+                </Pressable>
+            }
           </View>
           {/* <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : null}>
           </KeyboardAvoidingView> */}
@@ -303,11 +414,17 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   logo: {
+    position: 'absolute',
     width: 350, 
     height: 350, 
-    top: '-20%',
-    marginBottom: '-50%',
+    // top: '-100%',
     resizeMode: 'stretch',
+  },
+  logoIOS: {
+    marginTop: '-20%',
+  },
+  logoAndroid: {
+    marginTop: '-35%',
   },
   aside: {
     width: '100%',
@@ -322,7 +439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     // width: '100%',
     // height: '100%',
-    backgroundColor: '#3a65ab',
+    backgroundColor: '#242424',
     // padding: 40,
     position: 'relative',
     // paddingBottom: 40,
@@ -334,11 +451,12 @@ const styles = StyleSheet.create({
   },
   topbar: {
     // flex: 1,
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'white',
+    // borderBottomWidth: 1,
+    // borderBottomColor: 'white',
   },
   topbarIOS: {
     paddingHorizontal: 16,
@@ -352,8 +470,9 @@ const styles = StyleSheet.create({
     // flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 16,
-    backgroundColor: '#3a65ab'
+    backgroundColor: '#242424'
   },
   imgBtn: {
     color: 'white',
@@ -376,7 +495,7 @@ const styles = StyleSheet.create({
     flex: 1
   },
   textInput: {
-    backgroundColor: '#242424',
+    backgroundColor: '#505050',
     color: 'white',
     // position: 'absolute',
     // top: '90%',
@@ -409,7 +528,7 @@ const styles = StyleSheet.create({
   settingsPropBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     padding: 16,
     borderWidth: 1,
     borderRadius: 10,
@@ -449,7 +568,25 @@ const styles = StyleSheet.create({
   imageHistory: {
     flex: 1,
     paddingTop: 20,
-    backgroundColor: '#3a65ab',
+    backgroundColor: '#242424',
     position: 'relative'
+  },
+  voiceRecorder: {
+    width: '20%',
+    marginLeft: 6,
+    alignItems: 'center',
+    borderRadius: 50,
+    borderWidth: 1,
+    padding: 6,
+    backgroundColor: '#24242489'
+  },
+  voiceRecorderStop: {
+    width: '20%',
+    marginLeft: 6,
+    alignItems: 'center',
+    borderRadius: 50,
+    borderWidth: 1,
+    padding: 6,
+    backgroundColor: 'red'
   }
 });

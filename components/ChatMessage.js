@@ -79,11 +79,13 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
         color: 'white',
         padding: 16,
+        fontSize: 16,
     },
     answer: {
-        backgroundColor: '#caddfc',
+        backgroundColor: '#FAF7FF',
         color: 'black',
         padding: 16,
+        fontSize: 16,
     },
     image: {
         aspectRatio: 1,
@@ -91,7 +93,7 @@ const styles = StyleSheet.create({
         resizeMode: 'cover',
     },
     imageContainer: {
-        backgroundColor: '#caddfc',
+        backgroundColor: '#FAF7FF',
         flex: 1,
         padding: 16,
     },
